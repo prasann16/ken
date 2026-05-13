@@ -1,0 +1,29 @@
+{
+  "name": "ken",
+  "version": "0.1.0",
+  "module": "src/cli.ts",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "ken": "./dist/ken"
+  },
+  "scripts": {
+    "dev": "bun run src/cli.ts",
+    "build": "bun build src/cli.ts --compile --outfile dist/ken",
+    "seed": "bun run scripts/seed.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.92.0",
+    "citty": "^0.2.2",
+    "marked": "^18.0.3",
+    "smol-toml": "^1.6.1",
+    "sqlite-vec": "^0.1.9",
+    "ulid": "^3.0.2"
+  }
+}

@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>ken</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#C75D3F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ken">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="/icon.svg">
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<script src="/marked.umd.js"></script>
+<style>
+:root {
+  --bg: #F5F1EA;
+  --card: #FFFFFF;
+  --text: #1F1B16;
+  --muted: #7A736B;
+  --border: #E5DFD3;
+  --accent: #C75D3F;
+  --accent-soft: #FBE9E2;
+  --pin: #C5891F;
+  --pin-soft: #FAEFD3;
+  --danger: #B44A3F;
+  --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 12px rgba(0,0,0,.04);
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --serif: 'Georgia', 'Iowan Old Style', serif;
+  --sans: -apple-system, 'Inter', system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  display: flex; flex-direction: column;
+  /* iOS safe areas */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* === slim header === */
+header {
+  flex: 0 0 auto;
+  height: 50px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 0 16px;
+  display: flex; align-items: center; gap: 12px;
+}
+.brand {
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -.02em;
+  flex: 1;
+}
+.brand em { color: var(--accent); font-style: normal; }
+.header-btn {
+  width: 36px; height: 36px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .12s;
+}
+.header-btn:hover { border-color: var(--accent); color: var(--accent); }
+.header-btn svg { width: 18px; height: 18px; }
+.icon-btn svg { width: 18px; height: 18px; }
+.icon-action svg { width: 16px; height: 16px; }
+.chip-icon { display: inline-flex; vertical-align: -2px; margin-right: 2px; }
+.chip-icon svg { width: 12px; height: 12px; }
+.pin-mark svg { width: 13px; height: 13px; vertical-align: middle; }
+.tool-chip-link svg { width: 12px; height: 12px; vertical-align: -2px; margin-right: 2px; }
+
+/* === chat (main view) === */
+main#chat-main {
+  flex: 1 1 auto;
+  display: flex; flex-direction: column;
+  min-height: 0;
+  background: var(--bg);
+}
+.chat-msgs {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 20px 16px;
+  display: flex; flex-direction: column; gap: 12px;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+}
+.msg { max-width: 85%; padding: 10px 14px; border-radius: 14px; line-height: 1.45; word-wrap: break-word; }
+.msg.user {
+  align-self: flex-end;
+  background: var(--accent);
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+.msg.assistant {
+  align-self: flex-start;
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+/* Inside assistant bubbles: marked-rendered markdown */
+.msg.assistant > .md p { margin: 0 0 8px 0; }
+.msg.assistant > .md p:last-child { margin-bottom: 0; }
+.msg.assistant > .md ul, .msg.assistant > .md ol { margin: 6px 0; padding-left: 22px; }
+.msg.assistant > .md li { margin: 2px 0; }
+.msg.assistant > .md strong { font-weight: 600; }
+.msg.assistant > .md em { font-style: italic; }
+.msg.assistant > .md code {
+  background: var(--bg);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 0.9em;
+}
+.msg.assistant > .md pre {
+  background: var(--bg);
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 13px;
+  overflow-x: auto;
+  margin: 6px 0;
+}
+.msg.assistant > .md pre code { background: transparent; padding: 0; }
+.msg.assistant > .md a { color: var(--accent); text-decoration: underline; }
+.msg.assistant > .md h1, .msg.assistant > .md h2, .msg.assistant > .md h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 8px 0 4px 0;
+}
+/* Plain text mode (during streaming, before final render) */
+.msg.assistant.streaming { white-space: pre-wrap; }
+.msg.error {
+  align-self: stretch;
+  background: #FBE9E2;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  font-size: 13px;
+}
+.tool-chip {
+  align-self: flex-start;
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--muted);
+  padding: 3px 8px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.tool-chip-link {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+  cursor: pointer;
+  padding: 4px 10px;
+  transition: all .12s;
+}
+.tool-chip-link:hover { background: var(--accent); color: white; }
+.tool-refs {
+  align-self: flex-start;
+  display: flex; flex-wrap: wrap; gap: 4px;
+  max-width: 100%;
+}
+.tool-refs .tool-chip-link {
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+
+.chat-input-bar {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--border);
+  background: var(--card);
+  padding: 14px 16px;
+  padding-bottom: max(24px, calc(env(safe-area-inset-bottom) + 12px));
+  display: flex; gap: 8px; align-items: flex-end;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+}
+.chat-input-bar textarea {
+  flex: 1;
+  min-height: 40px; max-height: 140px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-family: var(--sans);
+  font-size: 16px; /* ≥16px prevents iOS zoom-on-focus */
+  resize: none; outline: none;
+  background: var(--bg);
+  color: var(--text);
+}
+.chat-input-bar textarea:focus { border-color: var(--accent); background: var(--card); }
+.icon-btn {
+  width: 40px; height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  cursor: pointer;
+  font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .12s;
+}
+.icon-btn:hover { border-color: var(--accent); }
+.icon-btn[hidden] { display: none; }
+.icon-btn.recording {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  animation: pulse 1.4s infinite;
+}
+.icon-btn.transcribing {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  cursor: progress;
+}
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(199, 93, 63, .4); }
+  50% { box-shadow: 0 0 0 8px rgba(199, 93, 63, 0); }
+}
+button.primary {
+  font-family: var(--sans);
+  font-size: 14px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+  height: 40px;
+  transition: background .12s;
+}
+button.primary:hover { background: #B04E33; border-color: #B04E33; }
+button.primary:disabled { opacity: .5; cursor: default; }
+button.primary:disabled:hover { background: var(--accent); border-color: var(--accent); }
+
+/* === list panel (slide-in from right) === */
+.list-panel {
+  position: fixed; top: 0; right: 0; bottom: 0;
+  width: 460px; max-width: 100%;
+  background: var(--card);
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  transform: translateX(100%);
+  transition: transform .22s ease;
+  z-index: 30;
+  box-shadow: -8px 0 32px rgba(0,0,0,.06);
+}
+.list-panel.open { transform: translateX(0); }
+.list-head {
+  flex: 0 0 auto;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+}
+.list-head .title { font-family: var(--serif); font-size: 18px; font-weight: 600; flex: 1; }
+.small {
+  font-size: 12px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: var(--sans);
+  color: var(--text);
+}
+.small:hover { border-color: var(--accent); color: var(--accent); }
+
+.list-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 14px 16px;
+}
+input[type="search"] {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  font-size: 16px;
+  color: var(--text);
+  font-family: var(--sans);
+  outline: none;
+  margin-bottom: 12px;
+}
+input[type="search"]:focus { border-color: var(--accent); background: var(--card); }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.chip {
+  font-size: 12px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: var(--sans);
+  transition: all .12s;
+}
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+.chip.active { background: var(--accent); border-color: var(--accent); color: white; }
+.meta-bar { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-bottom: 12px; }
+.empty { text-align: center; color: var(--muted); padding: 48px 16px; font-style: italic; }
+
+.card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  transition: box-shadow .12s, border-color .12s;
+}
+.card:hover { box-shadow: var(--shadow); }
+.card.pinned { border-left: 3px solid var(--pin); }
+.card.expanded { box-shadow: var(--shadow); border-color: var(--accent); }
+.card-head {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 12px 14px;
+  cursor: pointer;
+}
+.card-head .name {
+  flex: 1; min-width: 0;
+  font-weight: 500;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 14px;
+}
+.card-head .right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.time { font-size: 11px; color: var(--muted); }
+.pin-mark { color: var(--pin); font-size: 13px; }
+.card-body {
+  padding: 12px 14px 12px;
+  border-top: 1px solid var(--border);
+}
+.body-text {
+  white-space: pre-wrap;
+  font-size: 14px;
+  color: var(--text);
+  margin: 4px 0 8px;
+}
+.card-foot {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 10px;
+  gap: 8px;
+}
+.foot-tags { display: flex; flex-wrap: wrap; gap: 5px; flex: 1; min-width: 0; }
+.foot-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.icon-action {
+  width: 30px; height: 30px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .12s;
+}
+.icon-action:hover { background: var(--card); color: var(--accent); }
+.icon-action.pinned { color: var(--pin); }
+.icon-action.danger:hover { background: var(--danger); color: white; }
+.card-body .tags { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0; }
+.card-body .tag {
+  font-size: 11px; padding: 2px 8px;
+  background: var(--card); color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.card-body .tag.pin { background: var(--pin-soft); color: var(--pin); border-color: var(--pin); }
+.card-body .tag.task { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.card-body .tag.list { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.card-body .tag.done { background: #E5EDD9; color: #5A6F32; border-color: #C9D4B4; }
+.card-body .tag.idea { background: #ECDEED; color: #693972; border-color: #D8C7DA; }
+
+/* checklist (markdown task syntax) */
+.checklist {
+  margin: 10px 0;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.check-item {
+  display: flex; gap: 10px; align-items: flex-start;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: background .12s;
+  font-size: 14px;
+  user-select: none;
+}
+.check-item:hover { background: var(--card); }
+.check-item input[type="checkbox"] {
+  width: 18px; height: 18px;
+  margin: 1px 0 0 0;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.check-item.done span { color: var(--muted); text-decoration: line-through; }
+.check-line {
+  font-size: 13px;
+  color: var(--muted);
+  padding: 0 6px;
+  font-style: italic;
+}
+.add-item {
+  width: 100%;
+  font-family: var(--sans);
+  font-size: 14px;
+  padding: 8px 10px;
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--text);
+  outline: none;
+  border-radius: 6px;
+  margin-top: 4px;
+}
+.add-item:focus { border-style: solid; border-color: var(--accent); background: var(--card); }
+.add-item::placeholder { color: var(--muted); }
+.progress-pill {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 999px;
+  font-weight: 500;
+  margin-right: 8px;
+}
+.progress-pill.all-done { background: #E5EDD9; color: #5A6F32; }
+.card-body textarea {
+  width: 100%; min-height: 90px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  font-family: var(--sans);
+  font-size: 14px; color: var(--text);
+  resize: vertical; outline: none;
+  margin: 6px 0;
+}
+.card-body textarea:focus { border-color: var(--accent); }
+.actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.actions button {
+  font-family: var(--sans);
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+}
+.actions button:hover { border-color: var(--accent); color: var(--accent); }
+.actions .save { background: var(--accent); border-color: var(--accent); color: white; }
+.actions .save:hover { background: #B04E33; color: white; }
+.actions .danger { color: var(--danger); border-color: transparent; }
+.actions .danger:hover { background: var(--danger); border-color: var(--danger); color: white; }
+.actions .pinned { background: var(--pin-soft); border-color: var(--pin); color: var(--pin); }
+.preview {
+  color: var(--muted); font-size: 12px;
+  padding: 0 14px 12px;
+  margin-top: -2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* === toast === */
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: var(--text); color: var(--bg);
+  padding: 10px 18px; border-radius: 10px;
+  font-size: 13px;
+  opacity: 0; transition: opacity .2s;
+  pointer-events: none;
+  z-index: 50;
+}
+.toast.show { opacity: 1; }
+
+/* === auth overlay === */
+.auth-overlay {
+  position: fixed; inset: 0;
+  background: rgba(245,241,234,.96);
+  z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.auth-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 28px;
+  width: 360px; max-width: 100%;
+  box-shadow: var(--shadow);
+}
+.auth-card h2 { font-family: var(--serif); font-size: 22px; margin: 0 0 8px 0; }
+.auth-card p { color: var(--muted); font-size: 13px; margin: 0 0 16px 0; }
+.auth-card input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 16px;
+  outline: none;
+  margin-bottom: 12px;
+}
+.auth-card input:focus { border-color: var(--accent); }
+.auth-card .err { color: var(--danger); font-size: 12px; margin-top: -6px; margin-bottom: 12px; min-height: 16px; }
+.auth-card button { width: 100%; padding: 10px; }
+
+/* === mobile === */
+@media (max-width: 720px) {
+  .list-panel { width: 100%; max-width: 100%; }
+  .header-btn { width: 40px; height: 40px; }
+  .icon-btn { width: 44px; height: 44px; }
+  button.primary { height: 44px; padding: 10px 18px; }
+  .chat-input-bar textarea { min-height: 44px; }
+}
+</style>
+</head>
+<body>
+
+<div class="auth-overlay" id="auth-overlay" style="display:none">
+  <form class="auth-card" id="auth-form">
+    <h2>ken<span style="color:var(--accent)">.</span></h2>
+    <p>Enter your access token to continue.</p>
+    <input type="password" id="auth-token" placeholder="paste token" autocomplete="off" autofocus />
+    <div class="err" id="auth-err"></div>
+    <button type="submit" class="primary">unlock</button>
+  </form>
+</div>
+
+<header>
+  <div class="brand">ken<em>.</em></div>
+  <button class="header-btn" id="list-toggle" aria-label="open notes" title="notes"></button>
+</header>
+
+<main id="chat-main">
+  <div class="chat-msgs" id="chat-msgs"></div>
+  <div class="chat-input-bar">
+    <textarea id="chat-input" placeholder="talk to ken…" rows="1" aria-label="message ken — enter to send, shift+enter for newline"></textarea>
+    <button class="icon-btn" id="mic-btn" aria-label="voice input" title="voice" hidden></button>
+    <button class="primary" id="chat-send">send</button>
+  </div>
+</main>
+
+<aside class="list-panel" id="list-panel">
+  <div class="list-head">
+    <span class="title">your notes</span>
+    <button class="small" id="list-close">close</button>
+  </div>
+  <div class="list-body">
+    <input type="search" id="q" placeholder="search…" autocomplete="off" />
+    <div class="chips" id="chips">
+      <button class="chip active" data-special="">all</button>
+      <button class="chip" data-special="pin"><span class="chip-icon"></span> pinned</button>
+      <button class="chip" data-special="task">tasks</button>
+      <button class="chip" data-special="list">lists</button>
+      <button class="chip" data-special="idea">ideas</button>
+    </div>
+    <div class="meta-bar">
+      <span id="count">…</span>
+      <span id="hint"></span>
+    </div>
+    <div id="list"></div>
+  </div>
+</aside>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+
+// === icon library (inline SVG, line style, color-inherits) ===
+const ICONS = {
+  list: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>`,
+  mic: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`,
+  pin: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17z"/></svg>`,
+  edit: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`,
+  trash: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>`,
+  arrow: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>`,
+  close: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
+};
+function icon(name) { return ICONS[name] || ""; }
+
+// === auth ===
+const TOKEN_KEY = "ken-token";
+let kenToken = localStorage.getItem(TOKEN_KEY) || "";
+
+const _origFetch = window.fetch.bind(window);
+window.fetch = (input, init = {}) => {
+  if (kenToken) {
+    init.headers = { ...(init.headers || {}), "Authorization": "Bearer " + kenToken };
+  }
+  return _origFetch(input, init).then(async (res) => {
+    // Only clear ken token if the auth gate itself rejected us — not for upstream 401s.
+    if (res.status === 401) {
+      const body = await res.clone().json().catch(() => ({}));
+      if (body && body.error === "unauthorized") {
+        kenToken = "";
+        localStorage.removeItem(TOKEN_KEY);
+        showAuthOverlay("session expired — paste your token again");
+      }
+    }
+    return res;
+  });
+};
+
+async function bootAuth() {
+  try {
+    const res = await _origFetch("/api/auth/check", {
+      headers: kenToken ? { "Authorization": "Bearer " + kenToken } : {},
+    });
+    const data = await res.json();
+    if (res.ok && (data.auth === false || data.auth === true)) return true;
+  } catch {}
+  showAuthOverlay("");
+  return false;
+}
+
+function showAuthOverlay(errMsg) {
+  $("#auth-overlay").style.display = "flex";
+  $("#auth-err").textContent = errMsg || "";
+  $("#auth-token").focus();
+}
+
+$("#auth-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const candidate = $("#auth-token").value.trim();
+  if (!candidate) return;
+  const res = await _origFetch("/api/auth/check", { headers: { "Authorization": "Bearer " + candidate } });
+  if (res.ok) {
+    kenToken = candidate;
+    localStorage.setItem(TOKEN_KEY, kenToken);
+    $("#auth-overlay").style.display = "none";
+    initApp();
+  } else {
+    $("#auth-err").textContent = "wrong token";
+    $("#auth-token").select();
+  }
+});
+
+// === time formatting ===
+const fmtTime = (ms) => {
+  const d = Date.now() - ms;
+  if (d < 60_000) return "just now";
+  if (d < 3_600_000) return Math.floor(d / 60_000) + "m ago";
+  if (d < 86_400_000) return Math.floor(d / 3_600_000) + "h ago";
+  const days = Math.floor(d / 86_400_000);
+  if (days < 30) return days + "d ago";
+  if (days < 365) return Math.floor(days / 30) + "mo ago";
+  return Math.floor(days / 365) + "y ago";
+};
+
+function displayName(body) {
+  const lines = (body || "").split("\n").map(l => l.trim()).filter(Boolean);
+  const first = lines[0] || "";
+  return first.length > 80 ? first.slice(0, 77) + "..." : first || "(empty)";
+}
+
+const CHECKBOX_RE = /^(\s*-?\s*)\[([ x])\]\s+(.*)$/;
+
+function parseChecklist(body) {
+  // Returns { items: [{idx, leading, checked, text}], hasItems: bool, total, done }
+  const lines = (body || "").split("\n");
+  const items = [];
+  lines.forEach((line, idx) => {
+    const m = CHECKBOX_RE.exec(line);
+    if (m) items.push({ idx, leading: m[1], checked: m[2] === "x", text: m[3] });
+  });
+  const done = items.filter(i => i.checked).length;
+  return { items, hasItems: items.length > 0, total: items.length, done };
+}
+
+function toggleCheckboxLine(body, lineIdx) {
+  const lines = body.split("\n");
+  const line = lines[lineIdx];
+  if (!line) return body;
+  lines[lineIdx] = line.replace(/\[([ x])\]/, (_, c) => `[${c === "x" ? " " : "x"}]`);
+  return lines.join("\n");
+}
+
+function escape(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+}
+
+// === toast ===
+let toastTimer;
+function showToast(msg) {
+  const toast = $("#toast");
+  toast.textContent = msg;
+  toast.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove("show"), 1800);
+}
+
+// === list panel ===
+const list = $("#list");
+const count = $("#count");
+const hint = $("#hint");
+const q = $("#q");
+const chips = $("#chips");
+const listPanel = $("#list-panel");
+
+let listState = { special: "", q: "", expandedId: null, editingId: null };
+let listCache = [];
+let listLoaded = false;
+
+async function loadMemories() {
+  let url;
+  if (listState.q.trim()) {
+    url = "/api/search?q=" + encodeURIComponent(listState.q) + "&limit=50";
+  } else if (listState.special === "pin") {
+    url = "/api/pinned";
+  } else {
+    url = "/api/list?limit=200";
+  }
+  count.textContent = "…";
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("status " + res.status);
+    const data = await res.json();
+    let rows = Array.isArray(data) ? data : (data.results ?? []);
+    if (["task", "list", "idea"].includes(listState.special)) {
+      rows = rows.filter(r => (r.tags || []).includes(listState.special));
+    }
+    listCache = rows;
+    listLoaded = true;
+    renderList();
+  } catch (e) {
+    count.textContent = "error: " + e.message;
+  }
+}
+
+function renderList() {
+  count.textContent = listCache.length + (listCache.length === 1 ? " entry" : " entries");
+  hint.textContent = listState.q.trim() ? "by relevance" : (listState.special === "pin" ? "always loaded" : "newest first");
+  if (listCache.length === 0) {
+    list.innerHTML = '<div class="empty">nothing here yet</div>';
+    return;
+  }
+  list.innerHTML = listCache.map(renderCard).join("");
+  list.querySelectorAll(".card-head").forEach(el => {
+    el.onclick = () => {
+      const id = el.dataset.id;
+      listState.expandedId = listState.expandedId === id ? null : id;
+      listState.editingId = null;
+      renderList();
+    };
+  });
+  list.querySelectorAll("[data-action]").forEach(el => {
+    el.onclick = (e) => { e.stopPropagation(); handleAction(el.dataset.action, el.dataset.id); };
+  });
+  list.querySelectorAll("input[type='checkbox'][data-toggle-id]").forEach(el => {
+    el.onchange = async (e) => {
+      e.stopPropagation();
+      const id = el.dataset.toggleId;
+      const lineIdx = parseInt(el.dataset.lineIdx, 10);
+      await toggleChecklistItem(id, lineIdx);
+    };
+    el.closest(".check-item")?.addEventListener("click", (e) => e.stopPropagation());
+  });
+  list.querySelectorAll("input.add-item").forEach(el => {
+    el.onclick = (e) => e.stopPropagation();
+    el.onkeydown = async (e) => {
+      e.stopPropagation();
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const id = el.dataset.addId;
+        const text = el.value.trim();
+        if (!text) return;
+        el.disabled = true;
+        await addChecklistItem(id, text);
+      }
+    };
+  });
+}
+
+async function addChecklistItem(memoryId, text) {
+  const m = listCache.find(x => x.id === memoryId);
+  if (!m) return;
+  const sep = m.body && !m.body.endsWith("\n") ? "\n" : "";
+  const newBody = (m.body || "") + sep + `[ ] ${text}`;
+  const res = await fetch("/api/memory/" + memoryId, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ body: newBody }),
+  });
+  if (res.ok) {
+    m.body = newBody;
+    renderList();
+    // Re-focus the add input so user can type the next item
+    const newInput = list.querySelector(`input.add-item[data-add-id="${memoryId}"]`);
+    if (newInput) newInput.focus();
+  } else {
+    showToast("add failed");
+    const failedInput = list.querySelector(`input.add-item[data-add-id="${memoryId}"]`);
+    if (failedInput) failedInput.disabled = false;
+  }
+}
+
+async function toggleChecklistItem(memoryId, lineIdx) {
+  const m = listCache.find(x => x.id === memoryId);
+  if (!m) return;
+  const newBody = toggleCheckboxLine(m.body || "", lineIdx);
+  if (newBody === m.body) return;
+  // Optimistic local update
+  m.body = newBody;
+  // Update the textarea in the same expanded card if it's there
+  const ta = list.querySelector('textarea[data-edit-id="' + memoryId + '"]');
+  if (ta) ta.value = newBody;
+  renderList();
+  // PATCH the server
+  const res = await fetch("/api/memory/" + memoryId, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ body: newBody }),
+  });
+  if (!res.ok) {
+    showToast("save failed");
+    await loadMemories();
+  }
+}
+
+function renderCard(m) {
+  const expanded = listState.expandedId === m.id;
+  const isPinned = (m.tags || []).includes("pin");
+  const checklist = parseChecklist(m.body || "");
+
+  // Card title — for lists, use the first non-checkbox line if present
+  let name;
+  if (checklist.hasItems) {
+    const firstNonItem = (m.body || "").split("\n").find(l => l.trim() && !CHECKBOX_RE.test(l));
+    name = firstNonItem ? displayName(firstNonItem) : `${checklist.total} items`;
+  } else {
+    name = displayName(m.body);
+  }
+
+  const previewLines = (m.body || "").split("\n").filter(l => l.trim()).slice(1).join(" ");
+  const preview = !checklist.hasItems && previewLines ? previewLines.slice(0, 140) + (previewLines.length > 140 ? "…" : "") : "";
+
+  const progressPill = checklist.hasItems
+    ? `<span class="progress-pill ${checklist.done === checklist.total ? "all-done" : ""}">${checklist.done}/${checklist.total}</span>`
+    : "";
+
+  return `
+    <div class="card ${expanded ? "expanded" : ""} ${isPinned ? "pinned" : ""}">
+      <div class="card-head" data-id="${m.id}">
+        <div class="name">${escape(name)}</div>
+        <div class="right">
+          ${progressPill}
+          ${isPinned ? `<span class="pin-mark">${icon("pin")}</span>` : ''}
+          <span class="time">${fmtTime(m.created_at)}</span>
+        </div>
+      </div>
+      ${!expanded && preview ? `<div class="preview">${escape(preview)}</div>` : ''}
+      ${expanded ? renderExpandedBody(m, checklist, isPinned) : ''}
+    </div>
+  `;
+}
+
+function renderExpandedBody(m, checklist, isPinned) {
+  const editing = listState.editingId === m.id;
+  if (editing) {
+    return `
+      <div class="card-body">
+        <textarea data-edit-id="${m.id}">${escape(m.body || "")}</textarea>
+        <div class="actions">
+          <button class="save" data-action="save" data-id="${m.id}">save</button>
+          <button data-action="cancel" data-id="${m.id}">cancel</button>
+        </div>
+      </div>
+    `;
+  }
+  // Read mode
+  let bodyContent;
+  if (checklist.hasItems) {
+    // Pure list — only render the checkboxes. Title is in the card-head.
+    bodyContent = renderChecklist(m.id, checklist);
+  } else {
+    bodyContent = `<div class="body-text">${escape(m.body || "")}</div>`;
+  }
+  const tagPills = (m.tags || []).filter(t => t !== "pin").map(t => `<span class="tag ${reservedClass(t)}">${escape(t)}</span>`).join('');
+  return `
+    <div class="card-body">
+      ${bodyContent}
+      <div class="card-foot">
+        <div class="foot-tags">${tagPills}</div>
+        <div class="foot-actions">
+          <button class="icon-action" data-action="edit" data-id="${m.id}" title="edit text">${icon("edit")}</button>
+          <button class="icon-action ${isPinned ? 'pinned' : ''}" data-action="pin" data-id="${m.id}" title="${isPinned ? 'unpin' : 'pin'}">${icon("pin")}</button>
+          <button class="icon-action danger" data-action="delete" data-id="${m.id}" title="delete">${icon("trash")}</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderChecklist(memoryId, checklist) {
+  // Visual sort: unchecked first, then checked. (Body order unchanged — only display.)
+  const sorted = [...checklist.items].sort((a, b) => Number(a.checked) - Number(b.checked));
+  return `<div class="checklist">${sorted.map(item => `
+    <label class="check-item ${item.checked ? "done" : ""}">
+      <input type="checkbox" ${item.checked ? "checked" : ""} data-toggle-id="${memoryId}" data-line-idx="${item.idx}" />
+      <span>${escape(item.text)}</span>
+    </label>
+  `).join("")}<input class="add-item" type="text" placeholder="+ add item" data-add-id="${memoryId}" autocomplete="off" /></div>`;
+}
+
+function reservedClass(tag) {
+  return ["pin", "task", "list", "done", "idea"].includes(tag) ? tag : "";
+}
+
+async function handleAction(action, id) {
+  if (action === "edit") {
+    listState.editingId = id;
+    renderList();
+  } else if (action === "cancel") {
+    listState.editingId = null;
+    renderList();
+  } else if (action === "save") {
+    const el = list.querySelector('textarea[data-edit-id="' + id + '"]');
+    if (!el) return;
+    const newBody = el.value.trim();
+    if (!newBody) return showToast("can't save empty body");
+    showToast("saving…");
+    const res = await fetch("/api/memory/" + id, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ body: newBody }) });
+    if (res.ok) { showToast("saved"); listState.editingId = null; await loadMemories(); }
+    else { showToast("save failed"); }
+  } else if (action === "delete") {
+    if (!confirm("delete this? (soft-delete, recoverable via CLI)")) return;
+    const res = await fetch("/api/memory/" + id, { method: "DELETE" });
+    if (res.ok) { showToast("deleted"); listState.expandedId = null; await loadMemories(); }
+    else { showToast("delete failed"); }
+  } else if (action === "pin") {
+    const res = await fetch("/api/memory/" + id + "/pin", { method: "POST" });
+    if (res.ok) { const data = await res.json(); showToast(data.pinned ? "pinned" : "unpinned"); await loadMemories(); }
+    else { showToast("pin toggle failed"); }
+  }
+}
+
+// list panel toggle
+$("#list-toggle").onclick = () => {
+  listPanel.classList.add("open");
+  if (!listLoaded) loadMemories();
+};
+$("#list-close").onclick = () => listPanel.classList.remove("open");
+
+chips.onclick = (e) => {
+  if (!e.target.matches(".chip")) return;
+  chips.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
+  e.target.classList.add("active");
+  listState.special = e.target.dataset.special || "";
+  loadMemories();
+};
+
+let qTimer;
+q.oninput = () => {
+  clearTimeout(qTimer);
+  qTimer = setTimeout(() => { listState.q = q.value; loadMemories(); }, 250);
+};
+
+// === chat (main view) ===
+const chatMsgs = $("#chat-msgs");
+const chatInput = $("#chat-input");
+const chatSend = $("#chat-send");
+
+let sessionId = sessionStorage.getItem("ken-session-id");
+if (!sessionId) {
+  sessionId = crypto.randomUUID();
+  sessionStorage.setItem("ken-session-id", sessionId);
+}
+let inFlight = false;
+let greetingShown = false;
+
+async function showGreeting() {
+  if (greetingShown) return;
+  greetingShown = true;
+  try {
+    const res = await fetch("/api/greeting");
+    const data = await res.json();
+    appendMessage("assistant", data.text);
+  } catch {
+    appendMessage("assistant", "hey — what's on your mind?");
+  }
+}
+
+function appendMessage(role, text, opts = {}) {
+  const div = document.createElement("div");
+  div.className = "msg " + role;
+  if (role === "assistant" && opts.streaming) {
+    div.classList.add("streaming");
+    div.dataset.raw = text || "";
+    div.textContent = text;
+  } else if (role === "assistant" && text) {
+    // One-shot assistant message (e.g. greeting): render markdown immediately
+    if (window.marked) {
+      const escaped = escape(text);
+      const html = window.marked.parse(escaped, { gfm: true, breaks: true });
+      div.innerHTML = `<div class="md">${html}</div>`;
+    } else {
+      div.textContent = text;
+    }
+  } else {
+    div.textContent = text;
+  }
+  chatMsgs.appendChild(div);
+  chatMsgs.scrollTop = chatMsgs.scrollHeight;
+  return div;
+}
+
+function finalizeAssistantBubble(div) {
+  if (!div || !div.classList.contains("streaming")) return;
+  const raw = div.dataset.raw || div.textContent || "";
+  if (!raw.trim()) return;
+  if (window.marked) {
+    // Pre-escape so any raw HTML in the model's text becomes literal characters,
+    // then let marked render markdown syntax (which doesn't use < > so escaping is safe).
+    const escaped = escape(raw);
+    const html = window.marked.parse(escaped, { gfm: true, breaks: true });
+    div.innerHTML = `<div class="md">${html}</div>`;
+  }
+  div.classList.remove("streaming");
+}
+
+function appendToolChip(name) {
+  const chip = document.createElement("div");
+  chip.className = "tool-chip";
+  chip.textContent = "[" + name + "…]";
+  chatMsgs.appendChild(chip);
+  chatMsgs.scrollTop = chatMsgs.scrollHeight;
+  return chip;
+}
+
+function transformChipToLinks(chip, refs) {
+  if (!refs || refs.length === 0) return;
+  if (refs.length === 1) {
+    const ref = refs[0];
+    chip.className = "tool-chip tool-chip-link";
+    chip.innerHTML = icon("arrow") + " " + escape(ref.name || ref.id.slice(-6));
+    chip.title = "open " + (ref.name || ref.id);
+    chip.dataset.memoryId = ref.id;
+    chip.onclick = () => openMemoryInList(ref.id);
+    return;
+  }
+  // Multiple refs: replace the running chip with a wrapping container of clickable chips
+  const wrap = document.createElement("div");
+  wrap.className = "tool-refs";
+  refs.forEach((ref) => {
+    const linkChip = document.createElement("div");
+    linkChip.className = "tool-chip tool-chip-link";
+    linkChip.innerHTML = icon("arrow") + " " + escape(ref.name || ref.id.slice(-6));
+    linkChip.title = "open " + (ref.name || ref.id);
+    linkChip.dataset.memoryId = ref.id;
+    linkChip.onclick = () => openMemoryInList(ref.id);
+    wrap.appendChild(linkChip);
+  });
+  chip.replaceWith(wrap);
+}
+
+function openMemoryInList(memoryId) {
+  // Open list panel, reset filters to "all", load all memories, expand the target
+  listPanel.classList.add("open");
+  chips.querySelectorAll(".chip").forEach(c => c.classList.toggle("active", !c.dataset.special));
+  listState.special = "";
+  listState.q = "";
+  q.value = "";
+  loadMemories().then(() => {
+    listState.expandedId = memoryId;
+    listState.editingId = null;
+    renderList();
+    // Scroll the target card into view
+    setTimeout(() => {
+      const head = list.querySelector(`.card-head[data-id="${memoryId}"]`);
+      if (head) head.closest(".card")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 50);
+  });
+}
+
+chatInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendChat();
+  }
+});
+chatInput.addEventListener("input", autosizeChatInput);
+chatSend.onclick = sendChat;
+
+function autosizeChatInput() {
+  chatInput.style.height = "auto";
+  chatInput.style.height = Math.min(140, chatInput.scrollHeight) + "px";
+}
+
+async function sendChat() {
+  if (inFlight) return;
+  const text = chatInput.value.trim();
+  if (!text) return;
+  appendMessage("user", text);
+  chatInput.value = "";
+  autosizeChatInput();
+  inFlight = true;
+  chatSend.disabled = true;
+
+  const assistantBubble = appendMessage("assistant", "", { streaming: true });
+  let streamedAny = false;
+  let toolUsed = false;
+  let currentToolChip = null;
+
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ session_id: sessionId, user_message: text }),
+    });
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({ error: "request failed" }));
+      assistantBubble.remove();
+      appendMessage("error", "error: " + (errBody.error || res.status) + (errBody.hint ? ` — ${errBody.hint}` : ""));
+      return;
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        let event;
+        try { event = JSON.parse(line); } catch { continue; }
+        if (event.type === "text") {
+          assistantBubble.dataset.raw = (assistantBubble.dataset.raw || "") + event.delta;
+          assistantBubble.textContent = assistantBubble.dataset.raw;
+          streamedAny = true;
+          chatMsgs.scrollTop = chatMsgs.scrollHeight;
+        } else if (event.type === "tool_start") {
+          currentToolChip = appendToolChip(event.name);
+          toolUsed = true;
+        } else if (event.type === "tool_end") {
+          if (currentToolChip && event.refs && event.refs.length) {
+            transformChipToLinks(currentToolChip, event.refs);
+          }
+          currentToolChip = null;
+        } else if (event.type === "error") {
+          if (!streamedAny) assistantBubble.remove();
+          appendMessage("error", "error: " + event.message);
+        } else if (event.type === "done") {
+          if (!streamedAny) assistantBubble.remove();
+          else finalizeAssistantBubble(assistantBubble);
+        }
+      }
+    }
+  } catch (e) {
+    assistantBubble.remove();
+    appendMessage("error", "error: " + e.message);
+  } finally {
+    inFlight = false;
+    chatSend.disabled = false;
+    requestAnimationFrame(() => chatInput.focus());
+    if (toolUsed && listLoaded) loadMemories();
+  }
+}
+
+// === voice input (MediaRecorder + Whisper) ===
+const micBtn = $("#mic-btn");
+let mediaRecorder = null;
+let audioStream = null;
+let audioChunks = [];
+let recording = false;
+let transcribing = false;
+
+if (typeof MediaRecorder !== "undefined" && navigator.mediaDevices?.getUserMedia) {
+  micBtn.hidden = false;
+  micBtn.onclick = () => {
+    if (transcribing) return;
+    if (recording) stopRecording();
+    else startRecording();
+  };
+}
+
+async function startRecording() {
+  try {
+    audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) {
+    showToast("mic permission denied");
+    return;
+  }
+  audioChunks = [];
+  const mime = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm"
+    : MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4"
+    : "";
+  mediaRecorder = new MediaRecorder(audioStream, mime ? { mimeType: mime } : {});
+  mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
+  mediaRecorder.onstop = onRecordingStopped;
+  mediaRecorder.start();
+  recording = true;
+  micBtn.classList.add("recording");
+}
+
+function stopRecording() {
+  if (!mediaRecorder || mediaRecorder.state === "inactive") return;
+  mediaRecorder.stop();
+  if (audioStream) audioStream.getTracks().forEach(t => t.stop());
+  recording = false;
+  micBtn.classList.remove("recording");
+}
+
+async function onRecordingStopped() {
+  const mime = mediaRecorder?.mimeType || "audio/webm";
+  const ext = mime.includes("mp4") ? "m4a" : mime.includes("ogg") ? "ogg" : "webm";
+  const blob = new Blob(audioChunks, { type: mime });
+  audioChunks = [];
+  if (blob.size === 0) {
+    showToast("no audio captured");
+    return;
+  }
+  transcribing = true;
+  micBtn.classList.add("transcribing");
+  showToast("transcribing…");
+  try {
+    const fd = new FormData();
+    fd.append("file", blob, `recording.${ext}`);
+    const res = await fetch("/api/transcribe", { method: "POST", body: fd });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: "request failed" }));
+      showToast("transcribe failed: " + (err.error || res.status) + (err.hint ? ` — ${err.hint}` : ""));
+      return;
+    }
+    const data = await res.json();
+    const text = (data.text || "").trim();
+    if (!text) { showToast("no speech detected"); return; }
+    const sep = chatInput.value.trim() ? " " : "";
+    chatInput.value = chatInput.value + sep + text;
+    autosizeChatInput();
+    showToast("transcribed");
+  } catch (e) {
+    showToast("transcribe error: " + e.message);
+  } finally {
+    transcribing = false;
+    micBtn.classList.remove("transcribing");
+    chatInput.focus();
+  }
+}
+
+// === init ===
+function injectIcons() {
+  $("#list-toggle").innerHTML = icon("list");
+  if (micBtn) micBtn.innerHTML = icon("mic");
+  document.querySelectorAll(".chip-icon").forEach(el => { el.innerHTML = icon("pin"); });
+}
+
+function initApp() {
+  injectIcons();
+  showGreeting();
+  // Defer focus to next paint so the auth overlay's display:none has settled
+  requestAnimationFrame(() => chatInput.focus());
+}
+
+// Clicking anywhere in the chat area (other than a button/link) also focuses the input
+$("#chat-main").addEventListener("click", (e) => {
+  const tag = (e.target.tagName || "").toLowerCase();
+  if (tag === "button" || tag === "a" || tag === "input" || tag === "textarea" || tag === "svg" || tag === "path" || tag === "line" || tag === "rect" || tag === "polyline") return;
+  chatInput.focus();
+});
+
+bootAuth().then((ok) => { if (ok) initApp(); });
+</script>
+</body>
+</html>

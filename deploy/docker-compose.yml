@@ -1,0 +1,45 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ken-ollama
+    volumes:
+      - /srv/ken/ollama:/root/.ollama
+    restart: unless-stopped
+
+  ken:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: ken-app
+    environment:
+      - KEN_HOME=/data
+      - KEN_TOKEN=${KEN_TOKEN}
+      - OLLAMA_URL=http://ollama:11434
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - /srv/ken/data:/data
+    ports:
+      - "127.0.0.1:5556:5556"   # localhost only; Tailscale provides external access
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+  ken-telegram:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: ken-telegram
+    command: ["bun", "run", "src/cli.ts", "telegram"]
+    environment:
+      - KEN_HOME=/data
+      - OLLAMA_URL=http://ollama:11434
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - ALLOWED_CHAT_IDS=${ALLOWED_CHAT_IDS}
+    volumes:
+      - /srv/ken/data:/data
+    depends_on:
+      - ollama
+    restart: unless-stopped
