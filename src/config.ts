@@ -36,6 +36,14 @@ export type Config = {
   server: {
     token: string;
   };
+  email: {
+    user: string;
+    password: string;
+    imap_host: string;
+    smtp_host: string;
+    archive_folder: string;
+    trash_folder: string;
+  };
 };
 
 const HOME_DIR = process.env.KEN_HOME || join(homedir(), ".ken");
@@ -74,6 +82,14 @@ const DEFAULTS: Config = {
   },
   server: {
     token: "",
+  },
+  email: {
+    user: "",
+    password: "",
+    imap_host: "",
+    smtp_host: "",
+    archive_folder: "",
+    trash_folder: "",
   },
 };
 
@@ -116,6 +132,7 @@ function mergeDefaults(p: Partial<Config>): Config {
     chat: { ...DEFAULTS.chat, ...(p.chat ?? {}) },
     transcription: { ...DEFAULTS.transcription, ...(p.transcription ?? {}) },
     server: { ...DEFAULTS.server, ...(p.server ?? {}) },
+    email: { ...DEFAULTS.email, ...(p.email ?? {}) },
   };
 }
 

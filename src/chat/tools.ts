@@ -12,6 +12,14 @@ import {
 import { embedOne } from "../embed.ts";
 import { loadConfig } from "../config.ts";
 import { displayName } from "../util/fmt.ts";
+import {
+  searchEmails as imapSearchEmails,
+  getEmail as imapGetEmail,
+  sendEmail as imapSendEmail,
+  archiveEmails as imapArchiveEmails,
+  trashEmails as imapTrashEmails,
+  unsubscribeEmail as imapUnsubscribeEmail,
+} from "../integrations/email.ts";
 
 // Some models (especially smaller ones) double-escape newlines in tool inputs,
 // sending the literal two-character sequence \n instead of a real newline.
@@ -89,6 +97,78 @@ export const TOOL_DEFINITIONS: Anthropic.Tool[] = [
     input_schema: {
       type: "object" as const,
       properties: {},
+    },
+  },
+
+  // ---- email tools (Gmail via `gws` CLI) ----
+  {
+    name: "email_search",
+    description: "Read tool. Search the user's inbox. On Gmail, accepts Gmail query syntax: 'from:alice@example.com', 'newer_than:7d', 'is:unread', 'subject:invoice'. Returns id, sender, subject, date, and a short snippet for each match. The snippet may be truncated — if you need the full body, call email_get with the id.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string", description: "Search query (Gmail-style on Gmail; basic terms on other providers)" },
+        limit: { type: "integer", description: "Max results (default 10)" },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "email_get",
+    description: "Read tool. Fetch a single email's full body and headers by id (the id comes from email_search results). Use this when the snippet from search isn't enough — e.g. to draft a contextual reply or summarize.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        id: { type: "string", description: "Email id from email_search" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "email_send",
+    description: "REQUIRES USER APPROVAL — show the full draft (To, Subject, Body) in chat and get an explicit yes before calling. Sends an email via the user's Gmail account. Plain text only. For replies on an existing thread, pass the original email's id as in_reply_to to keep the thread together.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        to: { type: "string", description: "Recipient email address" },
+        subject: { type: "string", description: "Email subject" },
+        body: { type: "string", description: "Plain text body" },
+        in_reply_to: { type: "string", description: "Optional message id from email_search results — if present, the send is threaded as a reply" },
+      },
+      required: ["to", "subject", "body"],
+    },
+  },
+  {
+    name: "email_archive",
+    description: "REQUIRES USER APPROVAL — list what you're about to archive (subjects/senders) and get an explicit yes before calling. Removes emails from the inbox (does not delete them — they stay searchable in 'All Mail').",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        ids: { type: "array", items: { type: "string" }, description: "Message ids from email_search results" },
+      },
+      required: ["ids"],
+    },
+  },
+  {
+    name: "email_trash",
+    description: "REQUIRES USER APPROVAL — list what you're about to trash and get an explicit yes before calling. Moves emails to Trash (Gmail keeps them recoverable for 30 days). Never use for permanent deletion.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        ids: { type: "array", items: { type: "string" }, description: "Message ids from email_search results" },
+      },
+      required: ["ids"],
+    },
+  },
+  {
+    name: "email_unsubscribe",
+    description: "REQUIRES USER APPROVAL — identify the sender and get an explicit yes before calling. Attempts to unsubscribe from a mailing list using the email's List-Unsubscribe header. Returns the outcome: 'unsubscribed' on success (RFC 8058 one-click), 'manual_required' with a URL if only a link is available, or 'no_unsubscribe_method' if the email has no header.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        email_id: { type: "string", description: "Message id from email_search" },
+      },
+      required: ["email_id"],
     },
   },
 ];
@@ -171,6 +251,52 @@ export async function runTool(name: string, input: Record<string, unknown>): Pro
     case "get_pinned": {
       const rows = getPinnedMemories();
       return { count: rows.length, results: compact(rows) };
+    }
+
+    case "email_search": {
+      const query = String(input.query ?? "").trim();
+      if (!query) return { error: "empty query" };
+      const limit = typeof input.limit === "number" ? input.limit : 10;
+      const results = await imapSearchEmails(query, limit);
+      return { count: results.length, results };
+    }
+
+    case "email_get": {
+      const id = String(input.id ?? "").trim();
+      if (!id) return { error: "id required" };
+      const m = await imapGetEmail(id);
+      if (!m) return { error: `email ${id} not found` };
+      return m;
+    }
+
+    case "email_send": {
+      const to = String(input.to ?? "").trim();
+      const subject = String(input.subject ?? "").trim();
+      const body = String(input.body ?? "").trim();
+      const inReplyTo = input.in_reply_to ? String(input.in_reply_to) : undefined;
+      if (!to || !subject || !body) return { error: "to, subject, and body are required" };
+      const { messageId } = await imapSendEmail({ to, subject, body, inReplyToId: inReplyTo });
+      return { sent: true, to, subject, threaded: !!inReplyTo, message_id: messageId };
+    }
+
+    case "email_archive": {
+      const ids = Array.isArray(input.ids) ? (input.ids as string[]) : [];
+      if (ids.length === 0) return { error: "no ids" };
+      const archived = await imapArchiveEmails(ids);
+      return { archived };
+    }
+
+    case "email_trash": {
+      const ids = Array.isArray(input.ids) ? (input.ids as string[]) : [];
+      if (ids.length === 0) return { error: "no ids" };
+      const trashed = await imapTrashEmails(ids);
+      return { trashed };
+    }
+
+    case "email_unsubscribe": {
+      const id = String(input.email_id ?? "").trim();
+      if (!id) return { error: "email_id required" };
+      return await imapUnsubscribeEmail(id);
     }
 
     default:

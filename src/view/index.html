@@ -1117,6 +1117,7 @@ async function sendChat() {
   let streamedAny = false;
   let toolUsed = false;
   let currentToolChip = null;
+  let resumeAfterTool = false;
 
   try {
     const res = await fetch("/api/chat", {
@@ -1144,7 +1145,18 @@ async function sendChat() {
         let event;
         try { event = JSON.parse(line); } catch { continue; }
         if (event.type === "text") {
-          assistantBubble.dataset.raw = (assistantBubble.dataset.raw || "") + event.delta;
+          let delta = event.delta;
+          // After a tool call, the next text stream often starts without leading
+          // whitespace; previous stream often ended mid-thought. Insert a space
+          // so "inbox." + "Nothing urgent" doesn't collide into "inbox.Nothing".
+          if (resumeAfterTool && delta) {
+            const prev = assistantBubble.dataset.raw || "";
+            if (prev && !/\s$/.test(prev) && !/^\s/.test(delta)) {
+              delta = " " + delta;
+            }
+            resumeAfterTool = false;
+          }
+          assistantBubble.dataset.raw = (assistantBubble.dataset.raw || "") + delta;
           assistantBubble.textContent = assistantBubble.dataset.raw;
           streamedAny = true;
           chatMsgs.scrollTop = chatMsgs.scrollHeight;
@@ -1156,6 +1168,7 @@ async function sendChat() {
             transformChipToLinks(currentToolChip, event.refs);
           }
           currentToolChip = null;
+          resumeAfterTool = true;
         } else if (event.type === "error") {
           if (!streamedAny) assistantBubble.remove();
           appendMessage("error", "error: " + event.message);

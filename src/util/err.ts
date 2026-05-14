@@ -7,6 +7,7 @@ export type ErrCode =
   | "CONFIG"
   | "LLM_AUTH"
   | "LLM_DOWN"
+  | "EXTERNAL_TOOL"
   | "UNKNOWN";
 
 export class KenError extends Error {
@@ -32,6 +33,7 @@ function exitCodeFor(code: ErrCode): number {
     case "CONFIG": return 8;
     case "LLM_AUTH": return 9;
     case "LLM_DOWN": return 10;
+    case "EXTERNAL_TOOL": return 11;
     default: return 1;
   }
 }
