@@ -111,6 +111,24 @@ main#chat-main {
   border: 1px solid var(--border);
   border-bottom-left-radius: 4px;
 }
+/* Show a pulsing "thinking" indicator while a streaming assistant bubble is empty
+   (waiting for first text or while a tool is running). */
+.msg.assistant.streaming:empty {
+  min-width: 52px;
+}
+.msg.assistant.streaming:empty::after {
+  content: "● ● ●";
+  letter-spacing: 3px;
+  color: var(--muted);
+  display: inline-block;
+  animation: thinking 1.4s ease-in-out infinite;
+  font-size: 10px;
+  vertical-align: middle;
+}
+@keyframes thinking {
+  0%, 80%, 100% { opacity: 0.25; }
+  40% { opacity: 1; }
+}
 /* Inside assistant bubbles: marked-rendered markdown */
 .msg.assistant > .md p { margin: 0 0 8px 0; }
 .msg.assistant > .md p:last-child { margin-bottom: 0; }
@@ -219,11 +237,34 @@ main#chat-main {
 }
 .icon-btn:hover { border-color: var(--accent); }
 .icon-btn[hidden] { display: none; }
+.icon-btn.starting {
+  background: var(--card);
+  border-color: var(--border);
+  cursor: progress;
+}
+.icon-btn.starting svg { display: none; }
+.icon-btn.starting::after {
+  content: "";
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 .icon-btn.recording {
   background: var(--accent);
   border-color: var(--accent);
   color: white;
   animation: pulse 1.4s infinite;
+}
+.icon-btn.stopping {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  opacity: 0.5;
+  cursor: progress;
 }
 .icon-btn.transcribing {
   background: var(--accent-soft);
@@ -1194,56 +1235,135 @@ const micBtn = $("#mic-btn");
 let mediaRecorder = null;
 let audioStream = null;
 let audioChunks = [];
-let recording = false;
-let transcribing = false;
+let micState = "idle"; // idle | starting | recording | stopping | transcribing
+let recordingStartedAt = 0;
+let streamReleaseTimer = null;
+const MIN_RECORDING_MS = 300; // below this, captured audio is often empty
+const STREAM_KEEP_ALIVE_MS = 300_000; // 5 min — keep mic warm so next click is instant
+
+function setMicState(next) {
+  micState = next;
+  micBtn.classList.remove("starting", "recording", "stopping", "transcribing");
+  if (next !== "idle") micBtn.classList.add(next);
+}
+
+function streamIsLive() {
+  return !!audioStream && audioStream.getAudioTracks().some(t => t.readyState === "live");
+}
+
+function cancelStreamRelease() {
+  if (streamReleaseTimer) { clearTimeout(streamReleaseTimer); streamReleaseTimer = null; }
+}
+
+function scheduleStreamRelease() {
+  cancelStreamRelease();
+  streamReleaseTimer = setTimeout(releaseStream, STREAM_KEEP_ALIVE_MS);
+}
+
+function releaseStream() {
+  cancelStreamRelease();
+  if (audioStream) {
+    audioStream.getTracks().forEach(t => t.stop());
+    audioStream = null;
+  }
+}
+
+// Free the mic when the tab is hidden or the page closes — be a good citizen.
+document.addEventListener("visibilitychange", () => { if (document.hidden) releaseStream(); });
+window.addEventListener("beforeunload", releaseStream);
 
 if (typeof MediaRecorder !== "undefined" && navigator.mediaDevices?.getUserMedia) {
   micBtn.hidden = false;
-  micBtn.onclick = () => {
-    if (transcribing) return;
-    if (recording) stopRecording();
-    else startRecording();
+  micBtn.onclick = async () => {
+    if (micState === "idle") {
+      // Apply visual feedback IMMEDIATELY so the user sees the click registered,
+      // even though getUserMedia may block while the permission dialog is shown.
+      setMicState("starting");
+      await startRecording();
+    } else if (micState === "recording") {
+      // Block "stop" if user mashed it within the minimum recording window.
+      const elapsed = Date.now() - recordingStartedAt;
+      if (elapsed < MIN_RECORDING_MS) {
+        setTimeout(stopRecording, MIN_RECORDING_MS - elapsed);
+      } else {
+        stopRecording();
+      }
+    }
+    // ignore clicks in starting/stopping/transcribing
   };
 }
 
 async function startRecording() {
-  try {
-    audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  } catch (e) {
-    showToast("mic permission denied");
+  cancelStreamRelease();
+  // Reuse a still-live stream from a recent recording so subsequent clicks are instant.
+  if (!streamIsLive()) {
+    try {
+      audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (e) {
+      setMicState("idle");
+      showToast("mic permission denied");
+      return;
+    }
+  }
+  if (!audioStream.getAudioTracks().length) {
+    audioStream.getTracks().forEach(t => t.stop());
+    audioStream = null;
+    setMicState("idle");
+    showToast("no audio input found");
     return;
   }
+
   audioChunks = [];
   const mime = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm"
     : MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4"
     : "";
-  mediaRecorder = new MediaRecorder(audioStream, mime ? { mimeType: mime } : {});
-  mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
+  try {
+    mediaRecorder = new MediaRecorder(audioStream, mime ? { mimeType: mime } : {});
+  } catch (e) {
+    audioStream.getTracks().forEach(t => t.stop());
+    setMicState("idle");
+    showToast("recorder init failed: " + (e.message || e));
+    return;
+  }
+  mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) audioChunks.push(e.data); };
   mediaRecorder.onstop = onRecordingStopped;
-  mediaRecorder.start();
-  recording = true;
-  micBtn.classList.add("recording");
+  mediaRecorder.onerror = (ev) => {
+    console.error("MediaRecorder error:", ev);
+    setMicState("idle");
+    showToast("recording error");
+  };
+  // timeslice → ondataavailable fires periodically, more resilient than one-shot
+  mediaRecorder.start(1000);
+  recordingStartedAt = Date.now();
+  setMicState("recording");
 }
 
 function stopRecording() {
-  if (!mediaRecorder || mediaRecorder.state === "inactive") return;
+  if (!mediaRecorder || mediaRecorder.state === "inactive") {
+    setMicState("idle");
+    return;
+  }
+  setMicState("stopping");
+  // requestData() flushes any pending audio before stop
+  try { mediaRecorder.requestData(); } catch { /* not all impls support it */ }
   mediaRecorder.stop();
-  if (audioStream) audioStream.getTracks().forEach(t => t.stop());
-  recording = false;
-  micBtn.classList.remove("recording");
+  // onstop fires → tracks closed in onRecordingStopped
 }
 
 async function onRecordingStopped() {
+  // Note: we intentionally do NOT tear down audioStream here. Keeping it alive
+  // makes the next recording start instantly. A 60s timer releases it if idle.
+  scheduleStreamRelease();
   const mime = mediaRecorder?.mimeType || "audio/webm";
   const ext = mime.includes("mp4") ? "m4a" : mime.includes("ogg") ? "ogg" : "webm";
   const blob = new Blob(audioChunks, { type: mime });
   audioChunks = [];
   if (blob.size === 0) {
-    showToast("no audio captured");
+    setMicState("idle");
+    showToast("no audio captured — hold the mic for at least 1s and speak");
     return;
   }
-  transcribing = true;
-  micBtn.classList.add("transcribing");
+  setMicState("transcribing");
   showToast("transcribing…");
   try {
     const fd = new FormData();
@@ -1264,8 +1384,7 @@ async function onRecordingStopped() {
   } catch (e) {
     showToast("transcribe error: " + e.message);
   } finally {
-    transcribing = false;
-    micBtn.classList.remove("transcribing");
+    setMicState("idle");
     chatInput.focus();
   }
 }
